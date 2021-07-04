@@ -1,26 +1,16 @@
 library(shiny)
 library(magrittr)
+library(publicaccountstm)
 
-load("pac_defence_equip_sentiment.rda")
-load("pac_defence_equip_meta.rda")
+data("pac_equip_oral")
+data("pac_equip_sentiment")
+
+meta <- purrr::map_df(pac_equip_oral, "meta")
 
 ui <- fluidPage(
-  
+  highlight_sentimentUI(),
   tags$head(
-    tags$style(HTML("
-                  #transcript {
-                    height:400px;
-                    overflow-y:scroll
-                  }
-                  ")),
-    tags$style(HTML(
-      "mark.pos {background-color: lightgreen; 
-                 color: black;}
-       mark.neg {background-color: pink; 
-                 color: black;}
-       h1 { \n    display: block;\n    font-size: 1.2em;\n    margin-top: 0.0em;\n    margin-bottom: 0.0em;\n    margin-left: 0;\n    margin-right: 0;\n    font-weight: bold;\n}\n.indented {\n    margin-left: 5%%;\n    margin-right: 5%%;\n}
-       "
-    ))
+    tags$style(HTML("#transcript { height:400px; overflow-y:scroll}"))
   ),
   tabsetPanel(id = "tabs",
               tabPanel("Summary Data", 
@@ -34,7 +24,6 @@ server <- function(input, output, session) {
   values <- reactiveValues(transcript_select = 1)
   
   output$meta <- DT::renderDataTable({
-    
     createSpark <- function(x){
       if(length(x)<100){
         x <- stats::approx(x = seq_along(x), y = x, n = 100)[['y']]
@@ -56,27 +45,25 @@ server <- function(input, output, session) {
         as.character()
     }
     
-      purrr::map_df(sentiment, sentimentr::uncombine) %>%
-        dplyr::left_join(meta) %>%
-        dplyr::mutate(id = match(publication_reference, meta$publication_reference)) %>%
+    purrr::map_df(pac_equip_sentiment, sentimentr::uncombine) %>%
+      dplyr::left_join(meta, by = "publication_reference") %>%
+      dplyr::mutate(id = match(publication_reference, meta$publication_reference)) %>%
       dplyr::group_by(id, session, report_title, inquiry,
                       publication_date, publication_reference) %>%
       dplyr::summarise(sentiment_time = createSpark(sentiment),
                        sentiment_spread = createSparkBox(sentiment),
                        .groups = "drop") %>% 
-      DT::datatable(escape = F,
-                    rownames = F,
-                    selection = 'single',
-                    extensions = 'Scroller',
-                    options = list(
-                      dom = "t",
-                      scrollY = 200,
-                      scroller = TRUE,
-                      deferRender = TRUE,
-                      fnDrawCallback = htmlwidgets::JS(
-                        'function(){ HTMLWidgets.staticRender(); }'
-                      )
-                    )
+      DT::datatable(
+        escape = F, rownames = F,
+        selection = list(target = "row", selected = 1, mode = "single"),
+        extensions = 'Scroller',
+        options = list(
+          dom = "t",
+          scrollY = 200,
+          scroller = TRUE,
+          deferRender = TRUE,
+          fnDrawCallback = htmlwidgets::JS('function(){ HTMLWidgets.staticRender(); }')
+        )
       ) %>% 
       sparkline::spk_add_deps()
   })
@@ -86,44 +73,7 @@ server <- function(input, output, session) {
   }, ignoreNULL = TRUE, ignoreInit = TRUE)
   
   output$transcript <- renderUI({
-    x <- sentiment[[values$transcript_select]]
-    digits <- 3
-    polarity <- grouping.var <- NULL
-    if (!inherits(x, "sentiment_by")) 
-      stop("Must be a `sentiment_by` object")
-    y <- sentimentr::uncombine(x)
-    grps <- attributes(x)[["groups"]]
-    data.table::setDT(y)
-
-    y[, `:=`(polarity, ifelse(sentiment > 0, "pos", 
-                              ifelse(sentiment < 0, "neg", "")))][, `:=`(polarity, 
-                                                                         ifelse(is.na(polarity), "", polarity))]
-    txt <- sentimentr::get_sentences(x)
-    y[["txt"]] <- unlist(txt)
-    y[, `:=`(txt, ifelse(polarity == "", txt, sprintf("<mark class = \"%s\">%s</mark>", 
-                                                      polarity, txt)))]
-    mygrps_1 <- paste(sprintf("%s=%s[1L]", grps, grps), 
-                      collapse = ", ")
-    mygrps_2 <- parse(text = sprintf("paste(%s, sep=\", \")", 
-                                     paste(grps, collapse = ", ")))
-    suppressWarnings(y[, `:=`(gr, {
-      gr = eval(mygrps_2)
-      cumsum(c(TRUE, gr[-1] != gr[-.N]))
-    })])
-    y <- y[, list(sentiment = attributes(x)[["averaging.function"]](sentiment), 
-                  txt = paste(txt, collapse = " ")), by = c(grps, 
-                                                            "gr")]
-    mygrps <- parse(text = sprintf("paste(%s, sep=\"_\")", 
-                                   paste(grps, collapse = ", ")))
-    y[, `:=`(grouping.var, eval(mygrps))]
-    y[, `:=`(txt, sprintf("<h1>%s: <em><span style=\"color: %s\">%s</span></em></h1><p class=\"indented\">%s</p>", 
-                          grouping.var, ifelse(sentiment < 0, "red", ifelse(sentiment > 
-                                                                              0, "green", "#D0D0D0")), sentimentr:::formdig(sentiment, 
-                                                                                                                            digits), txt))]
-    body <- gsub(" rsreplacers", "", paste(y[["txt"]], 
-                                           collapse = "\n"))
-    
-    HTML(body)
+    highlight_sentiment(pac_equip_sentiment[[values$transcript_select]])
   })
   
 }

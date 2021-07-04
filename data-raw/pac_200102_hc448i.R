@@ -98,4 +98,3 @@ text <- src %>%
   dplyr::summarise(dialogue = paste(dialogue, collapse = " "), .groups = "drop")
 
 pac_200102_hc448i <- list(meta = meta, transcript = text)
-save(object = pac_200102_hc448i , file = "data/pac_200102_hc448i.rda")

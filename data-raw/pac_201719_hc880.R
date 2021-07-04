@@ -50,4 +50,3 @@ text <- pdf_text  %>%
 
 # Save ---- 
 pac_201719_hc880 <- list(meta = meta, transcript = text)
-save(object = pac_201719_hc880, file = "data/pac_201719_hc880.rda")

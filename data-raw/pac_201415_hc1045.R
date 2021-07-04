@@ -74,4 +74,3 @@ text <- tbl %>%
   dplyr::summarise(dialogue = paste(dialogue, collapse = " "), .groups = "drop")
 
 pac_201415_hc1045 <- list(meta = meta, transcript = text)
-save(object = pac_201415_hc1045, file = "data/pac_201415_hc1045.rda")

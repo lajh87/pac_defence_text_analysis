@@ -1,0 +1,130 @@
+---
+title: "Public Accounts Committee Oral Evidence: Sentiment Analysis"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    theme: flatly
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(publicaccountstm)
+library(magrittr)
+
+knitr::opts_chunk$set(echo = TRUE)
+values <- reactiveValues(transcript_select = 19)
+
+data("pac_equip_oral")
+data("pac_equip_sentiment")
+
+meta <- purrr::map_df(pac_equip_oral, "meta")
+
+```
+
+## Row {.tabset .tabset-fade}
+
+### Summary Table
+
+```{r,echo = FALSE}
+highlight_sentimentUI(rmd = TRUE)
+
+output$meta <- DT::renderDataTable({
+    createSpark <- function(x){
+      if(length(x)<100){
+        x <- stats::approx(x = seq_along(x), y = x, n = 100)[['y']]
+      }
+      sparkline::sparkline(syuzhet::get_dct_transform(x)) %>%
+        htmltools::as.tags() %>%
+        as.character()
+    }
+    
+    createSparkBox <- function(x){
+      sparkline::sparkline(x, type = "box") %>%
+        htmltools::as.tags() %>%
+        as.character()
+    }
+    
+    createSparkBar <- function(x){
+      sparkline::sparkline(x, type = "bar") %>%
+        htmltools::as.tags() %>%
+        as.character()
+    }
+    
+    purrr::map_df(pac_equip_sentiment, sentimentr::uncombine) %>%
+      dplyr::left_join(meta, by = "publication_reference") %>%
+      dplyr::mutate(id = match(publication_reference, meta$publication_reference)) %>%
+      dplyr::group_by(id, session, report_title, inquiry,
+                      publication_date, publication_reference) %>%
+      dplyr::summarise(sentiment_time = createSpark(sentiment),
+                       sentiment_spread = createSparkBox(sentiment),
+                       .groups = "drop") %>%
+      DT::datatable(
+        escape = F, rownames = F,
+        selection = list(target = "row", selected = 19, mode = "single"),
+        extensions = 'Scroller',
+        options = list(
+          dom = "t",
+          scrollY = 200,
+          scroller = TRUE,
+          deferRender = TRUE,
+          fnDrawCallback = htmlwidgets::JS('function(){ HTMLWidgets.staticRender(); }')
+        )
+      ) %>% 
+      sparkline::spk_add_deps()
+  })
+
+DT::dataTableOutput("meta", width = "90%")
+
+observeEvent(input$meta_row_last_clicked, {
+    values$transcript_select <- input$meta_row_last_clicked
+  }, ignoreNULL = TRUE, ignoreInit = TRUE)
+  
+```
+
+### Transcript
+
+```{r, echo = FALSE}
+
+ output$transcript <- renderUI({
+   sent <- pac_equip_oral[[values$transcript_select]]$transcript %>%
+       sentimentr::get_sentences() %>%
+     sentimentr::sentiment_by(by = c("paragraph_id", "person"))
+    attr(sent, "averaging.function") <- sentimentr::average_downweighted_zero
+    highlight_sentiment(sent)
+  })
+
+uiOutput("transcript")
+
+```
+
+## Row
+
+### Spread by Person
+
+```{r, echo = FALSE}
+
+output$person_box <- renderPlot({
+  pac_equip_oral[[values$transcript_select]]$transcript %>%
+  sentimentr::get_sentences() %>%
+  sentimentr::sentiment_by("person") %>%
+  plot()
+
+})
+
+
+plotOutput("person_box")
+
+```
+
+### Time Graph
+
+```{r, echo = FALSE}
+renderPlot({
+pac_equip_oral[[values$transcript_select]]$transcript %>%
+  sentimentr::get_sentences() %>%
+  sentimentr::sentiment_by("person") %>%
+  sentimentr::uncombine() %>%
+  plot()
+})
+
+```

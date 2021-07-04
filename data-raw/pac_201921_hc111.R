@@ -48,4 +48,3 @@ text <- pdf_text  %>%
   dplyr::summarise(dialogue = paste(text, collapse = " "), .groups = "drop") 
 
 pac_201921_hc111 <- list(meta = meta, transcript = text)
-save(object = pac_201921_hc111, file = "data/pac_201921_hc111.rda")

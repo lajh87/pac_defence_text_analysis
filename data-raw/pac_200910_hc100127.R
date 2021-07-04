@@ -93,4 +93,3 @@ text <- src %>%
 
 # Save ----
 pac_200910_hc100127 <- list(meta = meta, transcript = text)
-save(object = pac_200910_hc100127, file = "data/pac_200910_hc100127.rda")

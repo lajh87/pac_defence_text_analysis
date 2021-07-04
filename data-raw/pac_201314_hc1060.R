@@ -72,4 +72,3 @@ text <- tbl %>%
 
 # Save ----
 pac_201314_hc1060 <- list(meta = meta, transcript = text)
-save(object = pac_201314_hc1060, file = "data/pac_201314_hc1060.rda")
